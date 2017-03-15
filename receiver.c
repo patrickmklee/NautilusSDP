@@ -23,28 +23,28 @@ const char pinList[5] = {PIN_LTHRUST, PIN_RTHRUST, PIN_LTOP, PIN_RTOP, PIN_FTOP}
 
 //Motor Functions
 
-void goForward(char percent) { //Use negative to reverse
+void goForward(int percent) { //Use negative to reverse
 	int pulse;
 	pulse = NEUTRAL_THROTTLE+(500*percent)/100;
 	gpioServo(PIN_LTHRUST, pulse);
 	gpioServo(PIN_RTHRUST, pulse);
 }
 
-void turnLeft(char percent) {
+void turnLeft(int percent) {
 	int pulse;
 	pulse = NEUTRAL_THROTTLE+(500*percent)/100;
 	gpioServo(PIN_LTHRUST, pulse);
 	gpioServo(PIN_RTHRUST, NEUTRAL_THROTTLE);
 }
 
-void turnRight(char percent) {
+void turnRight(int percent) {
 	int pulse;
 	pulse = NEUTRAL_THROTTLE+(500*percent)/100;
 	gpioServo(PIN_LTHRUST, pulse);
 	gpioServo(PIN_RTHRUST, NEUTRAL_THROTTLE);
 }
 
-void dive(char percent) { //Use negative percent to rise
+void dive(int percent) { //Use negative percent to rise
 	int pulse;
 	pulse = NEUTRAL_THROTTLE+(500*percent)/100;
 	gpioServo(PIN_LTOP, pulse);
@@ -79,7 +79,8 @@ void *receiveCmds(void * mArgs) {
    // open the named pipe
    pipe = open("/var/www/html/myFIFO", O_RDONLY | O_NONBLOCK);
 
-   int hAccel, vAccel = 0;
+   int hAccel = 0;
+   int vAccel = 0;
    int fwdHold, revHold, diveHold, riseHold = 0;
    while (1) {
       if ((bytes_read = read(pipe, line, MAX_LINE)) > 0){
@@ -136,33 +137,46 @@ void *receiveCmds(void * mArgs) {
 	 } else
          	printf("Received: %s\n",line);
       }
+	printf("\n@@@@@@@@@@@@@ LINE: %s \n@@@@@@@@@@@@@@@@@@@\n", line);
 
       if (diveHold){
       	//Accelerate down
-      	if (vAccel < 100) vAccel += 5;
+	if (vAccel < 0) vAccel = 0;
+      	if (vAccel+5 <= 100) vAccel += 5;
       } else if (riseHold){
       	//Accelerate up
-      	if (vAccel > -100) vAccel -= 5;
+	if (vAccel > 0) vAccel = 0;
+      	if (vAccel-5 >= -100) vAccel -= 5;
       } else {
       	//Decelerate
-      	if (vAccel < 0) vAccel += 5;
-      	if (vAccel > 0) vAccel -= 5;
+      	if (vAccel <= -10) vAccel += 10;
+      	if (vAccel >= 10) vAccel -= 10;
+	if (vAccel < 10 && vAccel > -10){
+		 vAccel = 0;
+		 dive(vAccel);
+	}
       }
 
       if (fwdHold){
       	//Accelerate forward
-      	if (hAccel < 100) hAccel += 5;
+	if (hAccel < 0) hAccel = 0;
+      	if (hAccel+5 < 100) hAccel += 5;
       } else if (revHold){
       	//Accelerate backward
-      	if (hAccel > -100) hAccel -= 5;
+	if (hAccel > 0) hAccel = 0;
+      	if (hAccel-5 > -100) hAccel -= 5;
       } else {
-      	if (hAccel < 0) hAccel += 5;
-      	if (hAccel > 0) hAccel -= 5;
+      	if (hAccel <= 10) hAccel += 10;
+      	if (hAccel >= 10) hAccel -= 10;
+	if (hAccel < 10 && hAccel > -10) {
+		hAccel = 0;
+		goForward(hAccel);
+	}
       }
-
-      if (vAccel != 0) dive(vAccel);
-      if (hAccel != 0) goForward(hAccel);
-
+      //printf("vAccel: %d\n", vAccel);
+      //printf("hAccel: %d\n", hAccel);
+      if (vAccel != 0 && vAccel >= -100 && vAccel <= 100) dive(vAccel);
+      if (hAccel != 0 && hAccel >= -100 && hAccel <= 100) goForward(hAccel);
 
       delay(150);
 	// else
