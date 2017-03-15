@@ -21,14 +21,30 @@
 
 const char pinList[5] = {PIN_LTHRUST, PIN_RTHRUST, PIN_LTOP, PIN_RTOP, PIN_FTOP};
 
-void goForward(char percent) {
+//Motor Functions
+
+void goForward(char percent) { //Use negative to reverse
 	int pulse;
 	pulse = NEUTRAL_THROTTLE+(500*percent)/100;
 	gpioServo(PIN_LTHRUST, pulse);
 	gpioServo(PIN_RTHRUST, pulse);
 }
 
-void dive(char percent) {
+void turnLeft(char percent) {
+	int pulse;
+	pulse = NEUTRAL_THROTTLE+(500*percent)/100;
+	gpioServo(PIN_LTHRUST, pulse);
+	gpioServo(PIN_RTHRUST, NEUTRAL_THROTTLE);
+}
+
+void turnRight(char percent) {
+	int pulse;
+	pulse = NEUTRAL_THROTTLE+(500*percent)/100;
+	gpioServo(PIN_LTHRUST, pulse);
+	gpioServo(PIN_RTHRUST, NEUTRAL_THROTTLE);
+}
+
+void dive(char percent) { //Use negative percent to rise
 	int pulse;
 	pulse = NEUTRAL_THROTTLE+(500*percent)/100;
 	gpioServo(PIN_LTOP, pulse);
@@ -41,8 +57,7 @@ void initMotors() {
 	for (i=0;i<NUM_MOTORS;i++){
 		gpioServo(pinList[i], NEUTRAL_THROTTLE);
 	}
-	//gpioServo(PIN_LTHRUST, NEUTRAL_THROTTLE);
-	//gpioServo(PIN_RTHRUST, NEUTRAL_THROTTLE);
+
 }
 void *receiveCmds(void * mArgs) {
    initMotors(); 
@@ -63,9 +78,12 @@ void *receiveCmds(void * mArgs) {
 
    // open the named pipe
    pipe = open("/var/www/html/myFIFO", O_RDONLY | O_NONBLOCK);
+
+   int hAccel, vAccel = 0;
+   int fwdHold, revHold, diveHold, riseHold = 0;
    while (1) {
       if ((bytes_read = read(pipe, line, MAX_LINE)) > 0){
-         if (strncmp(line,keyup_cmd,2) == 0){
+        if (strncmp(line,keyup_cmd,2) == 0){
 		//dir=0;
 		printf("Stop ");
 	 } else if (strncmp(line,keydown_cmd,2)==0){
@@ -75,30 +93,77 @@ void *receiveCmds(void * mArgs) {
 	 sub_line = (line+2*sizeof(char));		
 	 cmdVal = atoi(sub_line);
 	 //line[bytes_read-1]='\0'; //replace LF char
-	 //printf("%d\n",strcmp(line,wr_cmd));	 
-	 if(cmdVal == 38) {
+	 //printf("%d\n",strcmp(line,wr_cmd));	
+
+	 if(cmdVal == 38) { //Arrow up
+	 	if ( (line[0] == 'u') && (line[1] == 'p') ){
+			riseHold = 0;
+		} else if ( (line[0] == 'd') && (line[1] == 'n') && !diveHold ){
+			riseHold = 1;
+		}
 		printf("Up\n");
-	 } else if (cmdVal == 39){
-		printf("Right\n");
-	 } else if (cmdVal == 37) {
-		printf("Left\n");
-	 } else if (cmdVal == 40) {
+
+	 } else if (cmdVal == 40) { //Arrow Down
 		if ( (line[0] == 'u') && (line[1] == 'p') ){
-			dive(0);
-		} else if ( (line[0] == 'd') && (line[1] == 'n') ){
-			dive(20);
+			diveHold = 0;
+		} else if ( (line[0] == 'd') && (line[1] == 'n') && !riseHold ){
+			diveHold = 1;
 		}
 		printf("Down\n");
-	 } else if (cmdVal == 32) {
+
+	 } else if (cmdVal == 39){ //Arrow right
+		printf("Right\n");
+
+	 } else if (cmdVal == 37) { //Arrow left
+		printf("Left\n");
+
+	 } else if (cmdVal == 32) { //Spacebar
 		if ( (line[0] == 'u') && (line[1] == 'p') ) {
-			goForward(0);
-		} else if ( (line[0] == 'd') && (line[1] == 'n') ) {
-			goForward(20);
+			fwdHold = 0;
+		} else if ( (line[0] == 'd') && (line[1] == 'n') && !revHold) {
+			fwdHold = 1;
 		}
 		printf("Forward\n");	
+
+	 } else if (cmdVal == 82) { // R key
+	 	if ( (line[0] == 'u') && (line[1] == 'p') ) {
+			revHold = 0;
+		} else if ( (line[0] == 'd') && (line[1] == 'n') && !fwdHold) {
+			revHold = 1;
+		}
+		printf("Reverse\n");
+
 	 } else
          	printf("Received: %s\n",line);
       }
+
+      if (diveHold){
+      	//Accelerate down
+      	if (vAccel < 100) vAccel += 5;
+      } else if (riseHold){
+      	//Accelerate up
+      	if (vAccel > -100) vAccel -= 5;
+      } else {
+      	//Decelerate
+      	if (vAccel < 0) vAccel += 5;
+      	if (vAccel > 0) vAccel -= 5;
+      }
+
+      if (fwdHold){
+      	//Accelerate forward
+      	if (hAccel < 100) hAccel += 5;
+      } else if (revHold){
+      	//Accelerate backward
+      	if (hAccel > -100) hAccel -= 5;
+      } else {
+      	if (hAccel < 0) hAccel += 5;
+      	if (hAccel > 0) hAccel -= 5;
+      }
+
+      if (vAccel != 0) dive(vAccel);
+      if (hAccel != 0) goForward(hAccel);
+
+
       delay(150);
 	// else
         // break;
