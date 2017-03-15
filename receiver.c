@@ -81,7 +81,7 @@ void *receiveCmds(void * mArgs) {
 
    int hAccel = 0;
    int vAccel = 0;
-   int fwdHold, revHold, diveHold, riseHold = 0;
+   int fwdHold, revHold, diveHold, riseHold,leftHold, rightHold = 0;
    while (1) {
       if ((bytes_read = read(pipe, line, MAX_LINE)) > 0){
         if (strncmp(line,keyup_cmd,2) == 0){
@@ -113,15 +113,25 @@ void *receiveCmds(void * mArgs) {
 		printf("Down\n");
 
 	 } else if (cmdVal == 39){ //Arrow right
+	 	if ( (line[0] == 'u') && (line[1] == 'p') ) {
+			rightHold = 0;
+		} else if ( (line[0] == 'd') && (line[1] == 'n') && !(revHold || leftHold || fwdHold) ) {
+			rightHold = 1;
+		}
 		printf("Right\n");
 
 	 } else if (cmdVal == 37) { //Arrow left
+	 	if ( (line[0] == 'u') && (line[1] == 'p') ) {
+			leftHold = 0;
+		} else if ( (line[0] == 'd') && (line[1] == 'n') && !(revHold || fwdHold || rightHold) ) {
+			leftHold = 1;
+		}
 		printf("Left\n");
 
 	 } else if (cmdVal == 32) { //Spacebar
 		if ( (line[0] == 'u') && (line[1] == 'p') ) {
 			fwdHold = 0;
-		} else if ( (line[0] == 'd') && (line[1] == 'n') && !revHold) {
+		} else if ( (line[0] == 'd') && (line[1] == 'n') && !(revHold || leftHold || rightHold) ) {
 			fwdHold = 1;
 		}
 		printf("Forward\n");	
@@ -129,7 +139,7 @@ void *receiveCmds(void * mArgs) {
 	 } else if (cmdVal == 82) { // R key
 	 	if ( (line[0] == 'u') && (line[1] == 'p') ) {
 			revHold = 0;
-		} else if ( (line[0] == 'd') && (line[1] == 'n') && !fwdHold) {
+		} else if ( (line[0] == 'd') && (line[1] == 'n') && !(fwdHold || leftHold || rightHold) ) {
 			revHold = 1;
 		}
 		printf("Reverse\n");
@@ -137,7 +147,6 @@ void *receiveCmds(void * mArgs) {
 	 } else
          	printf("Received: %s\n",line);
       }
-	printf("\n@@@@@@@@@@@@@ LINE: %s \n@@@@@@@@@@@@@@@@@@@\n", line);
 
       if (diveHold){
       	//Accelerate down
@@ -157,7 +166,7 @@ void *receiveCmds(void * mArgs) {
 	}
       }
 
-      if (fwdHold){
+      if (fwdHold || rightHold || leftHold){
       	//Accelerate forward
 	if (hAccel < 0) hAccel = 0;
       	if (hAccel+5 < 100) hAccel += 5;
@@ -173,10 +182,13 @@ void *receiveCmds(void * mArgs) {
 		goForward(hAccel);
 	}
       }
-      //printf("vAccel: %d\n", vAccel);
-      //printf("hAccel: %d\n", hAccel);
+
       if (vAccel != 0 && vAccel >= -100 && vAccel <= 100) dive(vAccel);
-      if (hAccel != 0 && hAccel >= -100 && hAccel <= 100) goForward(hAccel);
+      if (hAccel != 0 && hAccel >= -100 && hAccel <= 100) {
+      	if (leftHold) turnLeft(hAccel);
+      	else if (rightHold) turnRight(hAccel);
+      	else goForward(hAccel);
+      }
 
       delay(150);
 	// else
