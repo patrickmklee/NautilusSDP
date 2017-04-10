@@ -24,7 +24,7 @@
 // LSM6DS3 CONFIGURATION
 // --------------------------------------------------------------------------
 #define LSM6DS3_DEVID 0x6b
-#define LSM6DS3_DPS 500
+#define LSM6DS3_DPS 245 
 #define LSM6DS3_XLG 2
 
 
@@ -103,29 +103,17 @@ void LSM6DS3_Setup(int pfd){
     i2cWriteByteData(pfd,0x0d,0x00);
     i2cWriteByteData(pfd,0x0e,0x20);//0x08); 
     //i2cWriteByteData(pfd,0x06,0xDC); //set FTH
-    i2cWriteWordData(pfd,0x06,0x05DC);
+    i2cWriteWordData(pfd,0x06,0x005A); //5DC
     i2cWriteByteData(pfd,0x13,0x01);
     i2cWriteByteData(pfd,0x0a,0x41);
     
     LSM6DS3_EmptyFIFO(pfd);
     i2cWriteByteData(pfd,0x0a,0x40);
-    i2cWriteByteData(pfd,0x11,0b10000100);
+    i2cWriteByteData(pfd,0x11,0b10000000);
     i2cWriteByteData(pfd,0x10,0b01100000);
     i2cWriteByteData(pfd,0x08,0b00001100); //gyro no decimation, xl decimation 4
     i2cWriteByteData(pfd,0x07,0x00);
     i2cWriteByteData(pfd,0x0a,0b01000001);// ODR=416, FIFO MODE
-    /*wiringPiI2CWriteReg8(fd,0x12,0x44);
-    wiringPiI2CWriteReg8(fd,0x0d,0x00);
-    wiringPiI2CWriteReg8(fd,0x0e,0x08); 
-    wiringPiI2CWriteReg8(fd,0x0a,0x26); 
-    LSM6DS3_EmptyFIFO(pfd);
-    wiringPiI2CWriteReg8(fd,0x0a,0x30);   wiringPiI2CWriteReg8(fd,0x11,0b01100100);
-    wiringPiI2CWriteReg8(fd,0x11,0b01100100);
-    wiringPiI2CWriteReg8(fd,0x10,0b01000000);
-    wiringPiI2CWriteReg8(fd,0x08,0b00001100); //gyro no decimation, xl decimation 4
-    wiringPiI2CWriteReg8(fd,0x07,0x00);
-    wiringPiI2CWriteReg8(fd,0x06,0x90); //set FTH
-    wiringPiI2CWriteReg8(fd,0x0a,0b00110110);// ODR=416, CONTINUOUS MODE*/
 }
 
 void stop(int signum) {
@@ -209,31 +197,15 @@ void *runCollection(void *bp){
 			//printf("FIFO OVRFLOW\n");
 			//fprintf(fp,"FIFO OVRFLOW\n");
                         i2cReadI2CBlockData(pfd,0x3E, (rxBlock),30u);
-			while((i2cReadByteData(pfd,0x3B)&(0x10))==0){
+			//while((i2cReadByteData(pfd,0x3B)&(0x10))==0){
                                 //printf("Reading\n");
 				i2cReadI2CBlockData(pfd,0x3E, (rxBlock),30u);
 				addNode(A,rxBlock, thisStart);
 				FIFO_FLAG++;
-			} 
+			//} 
 			fnum = 0;//(uint16_t)((i2cReadWordData(pfd,0x3A))&(0x0FFF));
 		}
-		fprintf(fp,"start - fnum: %ld\n", fnum);
-		if( fnum > 30){
-			//delayMicroseconds(5);
-			++k;
-			/*while( (i2cReadByteData(pfd,0x3c) != 0 ) ) {
-				i2cReadWordData(pfd,0x3e);
-			}*/
-			fprintf(fp,"reading %d bytes\n" ,i2cReadI2CBlockData(pfd, 0x3E, (rxBlock),30u));
-			addNode(A, rxBlock, thisStart);
-			fprintf(fp,"loop %d: read - fnum: %d\n",k, fnum);
-			fnum = (uint16_t)((i2cReadWordData(pfd,0x3A))&(0x0FFF)) ;
-			FIFO_FLAG++;
-		} else {
-			pArgs->BLOCK_READY=0;
-		}
-		i2cWriteByteData(pfd,0x0A,0x40);
-		i2cWriteByteData(pfd,0x0A,0x41);
+		pArgs->BLOCK_READY=0;
 		fprintf(fp,"Done - fnum: %d\n",fnum);
 	}
 	
@@ -319,6 +291,7 @@ void *runCollection(void *bp){
 					printf("Trying to re-align\n");
 				} else {*/
 				prev_xl_valz=xl_valz;	
+				//angle_x = angle_x+gy_valx;
 				angle_x=0.97*(angle_x+gy_valx)+(0.03)*(atan2f(xl_valy,xl_valz) * 180 / PI);
 				angle_y=0.97*(angle_y-gy_valy)+(0.03)*(atan2f(xl_valx,(xl_valz)) * 180 / PI);	
 				angle_z=(angle_z+gy_valz);//+(0.03)*(atan2f(xl_valx, xl_valy) * 180 / PI);

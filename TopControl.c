@@ -6,8 +6,9 @@
 #include <math.h>
 #include <unistd.h>
 #include "LSM6DS3_Collection.h"
+//#include "MS5803_Colletion.h"
 #include "receiver.h"
-pthread_t tid[2];
+pthread_t tid[3];
 
 
 //-------------------- PID PARAMETER DEFS -----------------------
@@ -22,8 +23,9 @@ int main(void) {
 	wiringPiSetup();
 	gpioInitialise();
 	uint8_t *mArgs; // placeholder not used right now
+	
 	gArgs = malloc(sizeof(struct pCollection_args)); //allocate mem for gyro data - gArgs is updated by runCollection function
-
+	uint8_t *tpArgs;
 	// Start individual threads
 	uint8_t err;
 	err = pthread_create(&(tid[0]), NULL, &runCollection, (void*)gArgs);
@@ -38,6 +40,12 @@ int main(void) {
 	} else {
 		printf("Motor Control thread created\n");
 	}
+	/*err = pthread_create(&(tid[2]), NULL, &runPressureSens, (void*)tpArgs);
+	if (err != 0) {
+		perror("Pressure thread error");
+	} else {
+		printf("Pressure thread created\n");
+	}*/
 	float y_out;
 	float y_err_p;
 	float y_err_prev;
@@ -49,7 +57,7 @@ int main(void) {
 		
 		//printf("TILT STATUS\n========================\n");
 		printf("x: %0.4f\n", gArgs->x);//(float)*(pCollection+sizeof(float)));
-		printf("y: %0.4f\n", gArgs->y);//(float)*(pCollection+sizeof(float)*2));
+		printf("y: %0.4f\n===================================\n", gArgs->y);//(float)*(pCollection+sizeof(float)*2));
 
 //			 ------ PID LOOP -------
 		y_err_p = round(gArgs->y-T_ROLL*10)/10; // P
@@ -57,10 +65,11 @@ int main(void) {
 		y_err_d = y_err_prev - y_err_p;		// D
 		y_err_prev = y_err_p;
 		y_out =	KP*(y_err_p) + KI*(y_err_i) + KD*(y_err_d);
-		printf("y-correction: %0.2f\n", y_out);
+		//printf("y-correction: %0.2f\n================================\n", y_out);
+		//printf("Pressure: %0.2f\n", tpArgs->p);
 
 	}
 	free(gArgs);
 	pthread_exit(NULL);
-	//return 0;
+	return 0;
 }

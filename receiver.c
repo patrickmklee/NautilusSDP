@@ -33,8 +33,8 @@ void goForward(int percent) { //Use negative to reverse
 void turnLeft(int percent) {
 	int pulse;
 	pulse = NEUTRAL_THROTTLE+(500*percent)/100;
-	gpioServo(PIN_LTHRUST, pulse);
-	gpioServo(PIN_RTHRUST, NEUTRAL_THROTTLE);
+	gpioServo(PIN_RTHRUST, pulse);
+	gpioServo(PIN_LTHRUST, NEUTRAL_THROTTLE);
 }
 
 void turnRight(int percent) {
@@ -158,7 +158,7 @@ void *receiveCmds(void * mArgs) {
       	if (vAccel-5 >= -100) vAccel -= 5;
       } else {
       	//Decelerate
-      	if (vAccel <= -10) vAccel += 10;
+       	if (vAccel <= -10) vAccel += 10;
       	if (vAccel >= 10) vAccel -= 10;
 	if (vAccel < 10 && vAccel > -10){
 		 vAccel = 0;
