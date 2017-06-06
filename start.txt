@@ -1,13 +1,13 @@
-+++ readlink -f /home/pi/RPi_Cam_Web_Interface/start.sh
-++ dirname /home/pi/RPi_Cam_Web_Interface/start.sh
-+ cd /home/pi/RPi_Cam_Web_Interface
++++ readlink -f /home/pi/RPi_Cam_Web_interface/start.sh
+++ dirname /home/pi/RPi_Cam_Web_interface/start.sh
++ cd /home/pi/RPi_Cam_Web_interface
 + source ./config.txt
 ++ rpicamdir=html
-++ webserver=apache
+++ webserver=nginx
 ++ webport=80
 ++ user=
 ++ webpasswd=
-++ autostart=no
+++ autostart=yes
 + fn_stop
 + sudo killall raspimjpeg
 + sudo killall php

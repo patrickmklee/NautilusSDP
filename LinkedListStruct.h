@@ -20,7 +20,7 @@ LinkedList newLinkedList(void);
 // freeDictionary()
 // destructor for the Dictionary type
 void freeLinkedList(LinkedList* pD);
-
+void emptyList(LinkedList L);
 // isEmpty()
 // returns 1 (true) if S is empty, 0 (false) otherwise
 // pre: none
