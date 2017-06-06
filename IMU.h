@@ -39,6 +39,7 @@ struct KalmanFilter {
 };
 struct KalmanFilter *NewKalmanFilter(double angle, double bias);
 double getAngleKalman( struct KalmanFilter *ThisAxis, double thisAngle, double thisRate, double deltaT );
+void rotateBtoI(struct pCollection_args angle, struct CoordinateAxis *axis);
 void updateXLCoordinateAxis(struct pCollection_args angle, struct CoordinateAxis *axis);
 
 
