@@ -30,7 +30,7 @@
 #define LSM6DS3_DPS 800
 #define LSM6DS3_XLG 2
 
-#define LPF_A	0.50f
+#define LPF_A	0.25
 // LSM6DS3 REGISTER ADDRESSES
 // -------------------------------------------------------------------------
 #define LSM6DS3_G_CTRL2		0x11
@@ -270,6 +270,7 @@ void *runCollection(void *bp){
     //LSM6DS3_SetupSPI();
     LSM6DS3_Setup(pfd);
     double meas_angle_x;
+    double LPF_xl_valx=0.0;
     double xl_valx_last=0;
     double xl_valy_last=0;
     double xl_valz_last=1.0;	
@@ -325,8 +326,9 @@ void *runCollection(void *bp){
 			case 6:
 			case 9:
 			case 12:
-				xl_valx += xl_valx_last + LPF_A*(curVal - xl_valx_last);
-				xl_valx_last = xl_valx;
+				xl_valx += curVal;
+				//xl_valx = xl_valx_last + LPF_A*(curVal - xl_valx_last);
+				//xl_valx_last = xl_valx;
 				//xl_valx += curVal*LSM6DS3_DPS*(double)dt/(double)32768.0 - offset_gy_x;///(double)4);
 				//fprintf(fp,"x-raw: %d\nx-conv: %0.4f\n", curVal,xl_valx);
 				break;
@@ -406,8 +408,9 @@ void *runCollection(void *bp){
 				clock_gettime(CLOCK_MONOTONIC_RAW,&tNow);
 				deltaT = (uint64_t)(tNow.tv_nsec - tLast.tv_nsec);
 				prev_xl_valz=xl_valz;
-				fprintf(fp, "BLOCK DONE\n");	
-				avg_xl_valx = (xl_valx-(offset_xl_x))*2.0/(4.0*32768.0);
+				fprintf(fp, "BLOCK DONE\n");
+				LPF_xl_valx = LPF_xl_valx + LPF_A*(xl_valx-LPF_xl_valx);
+				avg_xl_valx = (LPF_xl_valx-(offset_xl_x))*2.0/(4.0*32768.0);
 				avg_xl_valy = -(xl_valy-(offset_xl_y))*2.0/(4.0*32768.0);//0.00000244140625;
 				avg_xl_valz = -((xl_valz*2.0/(4.0*32768.0))+offset_xl_z);
 				gy_valz = (gy_valz-offset_gy_z)*(3*dt*500.0/(32768.0));//9.5467431650625e-6;///108789.76;	

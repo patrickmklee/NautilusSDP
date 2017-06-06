@@ -102,7 +102,7 @@ void updateXLCoordinateAxis(struct pCollection_args angle, struct CoordinateAxis
 	struct CoordinateAxis temp_axis = *axis;
 	angle.x = -angle.x;
 	//angle.y = -angle.y;
-	angle.z = -angle.z;
+	//angle.z = -angle.z;
 	/*angle.x = round(angle.x);
 	angle.y = round(angle.y);
 	angle.z = round(angle.z);*/
