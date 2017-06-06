@@ -81,13 +81,13 @@ void rotateBtoI(struct pCollection_args angle, struct CoordinateAxis *axis){
 
 	double mat[3][3];
 	mat[0][0] = cosz * cosy;
-	mat[0][1] = -cosy * sinz;
-	mat[0][2] = siny;
-	mat[1][0] = sinzcosx + (coszsinx * siny);
+	mat[1][0] = -cosy * sinz;
+	mat[2][0] = siny;
+	mat[0][1] = sinzcosx + (coszsinx * siny);
 	mat[1][1] = coszcosx - (sinzsinx * siny);
-	mat[1][2] = -sinx * cosy;
-	mat[2][0] = (sinzsinx) - (coszcosx * siny);
-	mat[2][1] = (coszsinx) + (sinzcosx * siny);
+	mat[2][1] = -sinx * cosy;
+	mat[0][2] = (sinzsinx) - (coszcosx * siny);
+	mat[1][2] = (coszsinx) + (sinzcosx * siny);
 	mat[2][2] = cosy * cosx;
 
 	axis->X = temp_axis.X * mat[0][0] + temp_axis.Y * mat[1][0] + temp_axis.Z * mat[2][0];
