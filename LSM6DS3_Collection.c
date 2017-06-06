@@ -460,17 +460,18 @@ void *runCollection(void *bp){
 					gDeltaArgs->x = kalAngleX - sum_OX; // ** Note: Not actually Sum variables .. too lazy to declare new ones
 					gDeltaArgs->y = kalAngleY - sum_OY;
 					gDeltaArgs->z = angle_z - sum_OZ;
-					//OrdinalAxis->X=sum_xl_valx/100.0;
-					//OrdinalAxis->Y=sum_xl_valy/100.0;
-					//OrdinalAxis->Z=sum_xl_valz/100.0;
-					OrdinalAxis->X=0.0;//sum_xl_valx/100.0;
-					OrdinalAxis->Y=0.0;//sum_xl_valy/100.0;
-					OrdinalAxis->Z=1.0;//sum_xl_valz/100.0;
+					OrdinalAxis->X=sum_xl_valx/100.0;
+					OrdinalAxis->Y=sum_xl_valy/100.0;
+					OrdinalAxis->Z=sum_xl_valz/100.0;
+					//OrdinalAxis->X=0.0;//sum_xl_valx/100.0;
+					//OrdinalAxis->Y=0.0;//sum_xl_valy/100.0;
+					//OrdinalAxis->Z=1.0;//sum_xl_valz/100.0;
 					sum_OX = kalAngleX;
 					sum_OY = kalAngleY;
 					sum_OZ = angle_z;
 					//struct CoordinateAxis tempAxis = OrdinalAxis;
-					updateXLCoordinateAxis(*pArgs,OrdinalAxis);
+					//updateXLCoordinateAxis(*pArgs,OrdinalAxis);
+					rotateBtoI(*pArgs,OrdinalAxis);
 					//sum_OX += OrdinalAxis->X;
 					//sum_OY += OrdinalAxis->Y;
 					//sum_OZ += OrdinalAxis->Z;
