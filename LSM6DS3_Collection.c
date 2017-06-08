@@ -27,10 +27,10 @@
 // LSM6DS3 CONFIGURATION
 // --------------------------------------------------------------------------
 #define LSM6DS3_DEVID 0x6b
-#define LSM6DS3_DPS 800
+#define LSM6DS3_DPS 500
 #define LSM6DS3_XLG 2
 
-#define LPF_A	0.25
+#define LPF_A	0.375
 // LSM6DS3 REGISTER ADDRESSES
 // -------------------------------------------------------------------------
 #define LSM6DS3_G_CTRL2		0x11
@@ -128,6 +128,8 @@ void LSM6DS3_EmptyFIFO(int pfd){
 		printf(".");
 		i2cReadWordData(pfd,0x3e);//,fillBuff,32u);
 	}
+    	i2cWriteByteData(pfd,0x0a,0b01010000);
+    	//i2cWriteByteData(pfd,0x0a,0b01010001);
 	//fillBuff=NULL;
 	printf("Done\n");
 }  
@@ -213,6 +215,7 @@ void *runCollection(void *bp){
 
 
     int i=0;
+    uint8_t k;
     char *txBlock;
     //rxBlockNew = malloc(sizeof(char)*420);
     rxBufferPing = malloc(sizeof(char)*30);
@@ -240,9 +243,9 @@ void *runCollection(void *bp){
     char EMPTY_FIFO=0; 
     double kalAngleX =0, kalAngleY =0;
     int prev_angle_x;    
-    int j;
+    uint8_t j;
     int ping=0;		
-    uint16_t k=0;
+    //uint16_t k=0;
     uint16_t fnum;
     uint16_t fifoStatus;
     char thisStart;
@@ -276,7 +279,14 @@ void *runCollection(void *bp){
     double xl_valz_last=1.0;	
     double meas_angle_y;
     txBufferState=!bufferState;
+    double accDataX[4]; // 4 datapoints per blcok
+    double accDataY[4];
+    double accDataZ[4];
+    double accVecSquared[4];
+    double accDataLPF[3] = {0.0, 0.0, -1.0};
+    double accAngle[2] = {0.0, 0.0};
     double sum_gy_valx=0,sum_gy_valy=0,sum_gy_valz=0;
+    double accSumDataZ=0, accSumDataX=0, accSumDataY=0;
     uint32_t sampCount=0;
     struct timespec tSampLast, tSampNow;
     clock_gettime(CLOCK_MONOTONIC_RAW, &tSampLast);
@@ -313,10 +323,10 @@ void *runCollection(void *bp){
 		switch(startpoint) {
 			case 0:
 				fprintf(fp, "curVal gyx: %d\n",curVal);
-				gy_valx = curVal;
+				gy_valx = -curVal;
 				break;
 			case 1:
-				gy_valy = curVal;
+				gy_valy = -curVal;
 				break;
 			case 2:
 				gy_valz = curVal;
@@ -326,25 +336,22 @@ void *runCollection(void *bp){
 			case 6:
 			case 9:
 			case 12:
-				xl_valx += curVal;
-				//xl_valx = xl_valx_last + LPF_A*(curVal - xl_valx_last);
-				//xl_valx_last = xl_valx;
-				//xl_valx += curVal*LSM6DS3_DPS*(double)dt/(double)32768.0 - offset_gy_x;///(double)4);
-				//fprintf(fp,"x-raw: %d\nx-conv: %0.4f\n", curVal,xl_valx);
+				accDataX[(startpoint/3)-1] = -curVal*(LSM6DS3_XLG/32768.0)-offset_xl_x;
+				//xl_valx += curVal;
 				break;
 			case 4:
 			case 7:
 			case 10:
 			case 13:
 				//xl_valy += curVal*LSM6DS3_DPS*dt/(double)32768.0 - offset_gy_y;///(double)4;
-				xl_valy += curVal;
+				accDataY[((startpoint-1)/3)-1] = curVal*(LSM6DS3_XLG/32768.0)-offset_xl_y;
 				break;
 			case 5:
 			case 8:
 			case 11:
 			case 14:
+				accDataZ[((startpoint-2)/3)-1] = -curVal*(LSM6DS3_XLG/32768.0)+offset_xl_z;
 				//xl_valz += curVal*LSM6DS3_DPS*dt/(double)32768.0 - offset_gy_z;///(double)4;
-				xl_valz += curVal;
 				break;
 			default:
 				printf("FIFO ERROR\n");
@@ -370,9 +377,15 @@ void *runCollection(void *bp){
 				sum_gy_valx += gy_valx;
 				sum_gy_valy += gy_valy;
 				sum_gy_valz += gy_valz;
-				sum_xl_valx += xl_valx;
+				for(j=0;j<4;j++){
+					accSumDataX += accDataX[j];
+					accSumDataY += accDataY[j];
+					accSumDataZ += accDataZ[j];	
+				}
+				
+				/*sum_xl_valx += xl_valx;
 				sum_xl_valy += xl_valy;
-				sum_xl_valz += xl_valz;
+				sum_xl_valz += xl_valz;*/
 				cal_count++;
 				xl_valx=0;xl_valy=0;xl_valz=0;
 				if (cal_count == CALIB_SAMPLE_COUNT){
@@ -380,18 +393,18 @@ void *runCollection(void *bp){
 					printf("========================\n");
 					CAL_MODE=0;
 					pArgs->CAL_COMPLETE=1;
-					offset_gy_x = sum_gy_valx*(500/(CALIB_SAMPLE_COUNT*32768.0));//16000.0;
-					offset_gy_y = sum_gy_valy*(500/(CALIB_SAMPLE_COUNT*32768.0));//16000.0;
+					offset_gy_x = sum_gy_valx*(LSM6DS3_DPS/(CALIB_SAMPLE_COUNT*32768.0));//16000.0;
+					offset_gy_y = sum_gy_valy*(LSM6DS3_DPS/(CALIB_SAMPLE_COUNT*32768.0));//16000.0;
 					offset_gy_z = sum_gy_valz/(double)(CALIB_SAMPLE_COUNT);//16000.0;
-					offset_xl_x = sum_xl_valx/(double)CALIB_SAMPLE_COUNT;//4000.0;
-					offset_xl_y = sum_xl_valy/(double)CALIB_SAMPLE_COUNT;//4000.0;
-					//offset_xl_z = xl_valz/(double)CALIB_SAMPLE_COUNT;
-					avg_xl_valx = sum_xl_valx/((double)CALIB_SAMPLE_COUNT*4.0*32768.0)*LSM6DS3_XLG;
-					avg_xl_valy = sum_xl_valy/((double)CALIB_SAMPLE_COUNT*4.0*32768.0)*LSM6DS3_XLG;
-					initAngleX = (180 / M_PI)*atan2(avg_xl_valy,avg_xl_valz);
-					initAngleY = (180 / M_PI)*atan2(-avg_xl_valx,avg_xl_valz);
+					offset_xl_x = accSumDataX/(double)CALIB_SAMPLE_COUNT/4.0;//4000.0;
+					offset_xl_y = accSumDataY/(double)CALIB_SAMPLE_COUNT/4.0;//4000.0;
+					offset_xl_z = -1.0-(accSumDataZ/CALIB_SAMPLE_COUNT/4.0);//0;//1.0-((sum_xl_valz/(double)CALIB_SAMPLE_COUNT)*(2.0/(32768.0*4.0)));//0.00006103515625);
+					avg_xl_valx = 0;//sum_xl_valx/((double)CALIB_SAMPLE_COUNT*4.0*32768.0)*LSM6DS3_XLG;
+					avg_xl_valy = 0;//sum_xl_valy/((double)CALIB_SAMPLE_COUNT*4.0*32768.0)*LSM6DS3_XLG;
+					initAngleX = 0;//(180 / M_PI)*atan2(avg_xl_valy,avg_xl_valz);
+					initAngleY = 0;//(180 / M_PI)*atan2(-avg_xl_valx,avg_xl_valz);
 					meas_angle_x = initAngleX;
-					offset_xl_z = 1.0-((sum_xl_valz/(double)CALIB_SAMPLE_COUNT)*(2.0/(32768.0*4.0)));//0.00006103515625);
+
 					fprintf(fp,"Gyro X Offset: %0.4f\n", offset_gy_x);
 					fprintf(fp,"Gyro X Offset: %0.4f\n", offset_gy_x);
 					fprintf(fp,"Init Angle X: %0.4f\n", initAngleX);
@@ -399,16 +412,41 @@ void *runCollection(void *bp){
 					fprintf(fp,"Acc X Offset: %0.4f\n", offset_xl_x);
 					fprintf(fp,"Acc Y Offset: %0.4f\n", offset_xl_y);
 					fprintf(fp,"Acc Z Offset: %0.4f\n\n%0.4f\n", offset_xl_z, (1.0+offset_xl_z));
-					KalmanAxisX = NewKalmanFilter(0.0,offset_gy_x);
-					KalmanAxisY = NewKalmanFilter(0.0,offset_gy_y);
+					KalmanAxisX = NewKalmanFilter(initAngleX,offset_gy_x);
+					KalmanAxisY = NewKalmanFilter(initAngleY,offset_gy_y);
+					accDataLPF[0] = 0.0;
+					accDataLPF[1] = 0.0;
+					accDataLPF[2] = -1.0;
 					sum_xl_valx=0;sum_xl_valy=0;sum_xl_valz=0;
 				//	clock_gettime(CLOCK_MONOTONIC_RAW,&tLast);
+				//}
 				}
 			} else {
+				fprintf(fp, "BLOCK DONE\n");
 				clock_gettime(CLOCK_MONOTONIC_RAW,&tNow);
 				deltaT = (uint64_t)(tNow.tv_nsec - tLast.tv_nsec);
+				for(j=0;j<4;j++){
+					accDataLPF[0] += LPF_A * (accDataX[j]-accDataLPF[0]);
+					accDataLPF[1] += LPF_A * (accDataY[j]-accDataLPF[1]);
+					accDataLPF[2] += LPF_A * (accDataZ[j]-accDataLPF[2]);
+//					accVecSquared[j] = accDataX[j]*accDataX[j]+accDataY[j]*accDataY[j]+accDataZ[j]*accDataZ[j];
+					
+					//if ((accVecSquared[j] < 1.2) && (accVecSquared[j] > 0.85)){
+						//for (k=0;k<3;k++) {
+						//	accDataLPF[k] += LPF_A*(accDataX[j]-accDataLPF[k]);}
+					//} else {
+
+						//printf("\n@@@@@@@ ignored reading @@@@@@@@@\n");
+					//}
+				}
+				double accMagSquared=0;
+				for(j=0;j<3;j++) { accMagSquared += accDataLPF[j]*accDataLPF[j]; }
+				if( (accMagSquared < 1.26) && (accMagSquared > 0.85) ){
+
+					accAngle[0] = (180.0/M_PI)*atan2(accDataLPF[1],-accDataLPF[2]);
+					accAngle[1] = 180.0/M_PI*(atan(-accDataLPF[0] / (sqrt(accDataLPF[1]* accDataLPF[1] + accDataLPF[2] * accDataLPF[2]))));
+				}
 				prev_xl_valz=xl_valz;
-				fprintf(fp, "BLOCK DONE\n");
 				LPF_xl_valx = LPF_xl_valx + LPF_A*(xl_valx-LPF_xl_valx);
 				avg_xl_valx = (LPF_xl_valx-(offset_xl_x))*2.0/(4.0*32768.0);
 				avg_xl_valy = -(xl_valy-(offset_xl_y))*2.0/(4.0*32768.0);//0.00000244140625;
@@ -428,17 +466,17 @@ void *runCollection(void *bp){
 				meas_angle_y = 180.0/M_PI*(atan(avg_xl_valx / (sqrt(avg_xl_valy * avg_xl_valy + avg_xl_valz * avg_xl_valz))));
 				
 				if ( ((meas_angle_x < -90) && (kalAngleX > 90)) || ((meas_angle_x > 90) && (kalAngleX < -90)) ){
-					kalAngleX = meas_angle_x;
+					kalAngleX = accAngle[0];
 				} else {	       
-					kalAngleX = getAngleKalman(KalmanAxisX,meas_angle_x,gy_valx,3.0*dt);
+					kalAngleX = getAngleKalman(KalmanAxisX,accAngle[0],gy_valx,2.875*dt);
 				}
 				if (abs(kalAngleX > 90)){
 					gy_valy = -gy_valy;
 				}
-				kalAngleY = getAngleKalman(KalmanAxisY,meas_angle_y,gy_valy,3.0*dt); 
+				kalAngleY = getAngleKalman(KalmanAxisY,accAngle[1],gy_valy,2.875*dt); 
 				//tLast=tNow;
 				//printf("tdelta: %ld\n", deltaT);
-				angle_x += gy_valx*3.0*dt;
+				angle_x += (gy_valx-offset_gy_x)*2.875*dt;
 				angle_y += gy_valy*3.0*dt;
 				//kalAngleXLast = kalAngleX;
 				//fprintf(fp, "%0.3f, %0.3f\n", angle_x, kalAngleX);
@@ -454,22 +492,22 @@ void *runCollection(void *bp){
 				xl_valx=0;
 				xl_valy=0;
 				xl_valz=0;
-				pArgs->xl_x = avg_xl_valx;
-				pArgs->xl_y = avg_xl_valy;//avg_xl_valy;
-				pArgs->xl_z = avg_xl_valz;//avg_xl_valz;//xl_valz;
+				pArgs->xl_x = accDataLPF[0];//avg_xl_valx;
+				pArgs->xl_y = accDataLPF[1];//avg_xl_valy;//avg_xl_valy;
+				pArgs->xl_z = accDataLPF[2];//avg_xl_valz;//avg_xl_valz;//xl_valz;
 				sum_xl_valx+=avg_xl_valx;
 				sum_xl_valy+=avg_xl_valy;
 				sum_xl_valz+=avg_xl_valz;
 		//		OrdinalAxis->X = avg_xl_valx;
 		//		OrdinalAxis->Y = avg_xl_valy;
 		//		OrdinalAxis->Z = avg_xl_valz;
-				if (xl_count == 100){
+				if (xl_count == 1){
 					gDeltaArgs->x = kalAngleX - sum_OX; // ** Note: Not actually Sum variables .. too lazy to declare new ones
 					gDeltaArgs->y = kalAngleY - sum_OY;
 					gDeltaArgs->z = angle_z - sum_OZ;
-					OrdinalAxis->X=sum_xl_valx/100.0;
-					OrdinalAxis->Y=sum_xl_valy/100.0;
-					OrdinalAxis->Z=sum_xl_valz/100.0;
+					OrdinalAxis->X = accDataLPF[0];
+					OrdinalAxis->Y = accDataLPF[1];
+					OrdinalAxis->Z = accDataLPF[2];
 					//OrdinalAxis->X=0.0;//sum_xl_valx/100.0;
 					//OrdinalAxis->Y=0.0;//sum_xl_valy/100.0;
 					//OrdinalAxis->Z=1.0;//sum_xl_valz/100.0;
@@ -482,10 +520,10 @@ void *runCollection(void *bp){
 					//sum_OX += OrdinalAxis->X;
 					//sum_OY += OrdinalAxis->Y;
 					//sum_OZ += OrdinalAxis->Z;
-					vx += (OrdinalAxis->X)*(981.0*3.0*100.0*dt); //(float)(deltaT*1.0e-09);//*0.00721*3.0;
-					vy += OrdinalAxis->Y*981.0*(300.0*dt);//*3.0;
-					vz += (OrdinalAxis->Z+1.0)*(981.0*300.0*dt);//981.0*0.06;//
-					AbsolutePosition->vX = vx;
+					vx += (OrdinalAxis->X)*(981.0*3.0*dt); //(float)(deltaT*1.0e-09);//*0.00721*3.0;
+					vy += OrdinalAxis->Y*981.0*(3.0*dt);//*3.0;
+					vz += (OrdinalAxis->Z+1.0)*(981.0*3.0*dt);//981.0*0.06;//
+					AbsolutePosition->vX = angle_x;
 					sum_xl_valx=0;
 					sum_xl_valy=0;
 					sum_xl_valz=0;

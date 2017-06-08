@@ -14,6 +14,6 @@ struct MotorThrottleStateStruct {
 
 
 void InitializeMotors();
-void updateMotorStates(float roll_correction, float pitch_correction, float yaw_correction, float z_correction);
+void updateMotorStates(float roll_correction, float pitch_correction, float yaw_correction, float vx_correction, float z_correction);
 
 #endif

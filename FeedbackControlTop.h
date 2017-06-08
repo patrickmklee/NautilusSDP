@@ -7,7 +7,7 @@
 
 struct AxisFeedbackState {
 	double setpoint;
-	double currentValue;
+	double *currentValue;
 	double KP;
 	double KI;
 	double KD;

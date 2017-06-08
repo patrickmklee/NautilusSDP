@@ -5,16 +5,26 @@
 #include <pthread.h>
 #include <math.h>
 #include <unistd.h>
+#include <time.h>
+
 #include "LSM6DS3_Collection.h"
 #include "MS5803_Collection.h"
 #include "FeedbackControlTop.h"
-//#include "FeedbackMotorController.h"
 #include "receiver.h"
 #include "IMU.h"
 
+#include "./EventFramework/EventFramework.h"
+#include "./EventFramework/UltrasonicEventChecker.h"
+#include "./EventFramework/DepthEventChecker.h"
+#include "./EventFramework/HumidityEventChecker.h"
+#include "./EventFramework/ADCEventChecker.h"
+#include "./EventFramework/eventQueue.h"
+#include "./EventFramework/HSM.h"
+#include "./EventFramework/MCP3202.h"
+
 pthread_t tid[4];
 
-
+#define TEST_POSITION_SYSTEM
 	
 //-------------------- PID PARAMETER DEFS -----------------------
 //Adjust KP,KI,KD
@@ -45,7 +55,11 @@ int main(void) {
 	fbArgs->yawState = malloc(sizeof(struct AxisFeedbackState));
 	fbArgs->VxState = malloc(sizeof(struct AxisFeedbackState));
 	fbArgs->zState = malloc(sizeof(struct AxisFeedbackState));
+	fbArgs->rollState->currentValue = &(gArgs->x);
 	OrdinalAxis = malloc(sizeof(struct CoordinateAxis));
+	const int SPIChan = 0;
+	const int SPIFreq = 2000000;
+	MCP3202Setup(ADC_PINBASE,SPIChan,SPIFreq);
 
 	OrdinalAxis->X=0.0;
 	OrdinalAxis->Y=0.0;
@@ -78,10 +92,10 @@ int main(void) {
 	float x_err_i=0;
 	float x_err_d;
 	//printf("Waiting for Calibration...\n");
-	while (gArgs->CAL_COMPLETE==0) {;}	
+	while (gArgs->CAL_COMPLETE != 1) {;}	
 	float prevX=0, prevY=0, prevZ=0;
-	fbArgs->rollState->currentValue = 0;//gArgs->x;
-	fbArgs->zState->currentValue = 0;//gArgs->x;
+	//fbArgs->rollState->currentValue = 0;//gArgs->x;
+	//fbArgs->zState->currentValue = 0;//gArgs->x;
 	err = pthread_create(&(tid[3]), NULL, &TopControlLoop, (void*)fbArgs);
 	if (err != 0) {
 		perror("Feedback Control thread error");
@@ -89,22 +103,40 @@ int main(void) {
 		printf("Feedback Control thread created\n");
 	}
 	//struct pCollection_args deltaAngles;
+#ifndef TEST_POSITION_SYSTEM
+	Queue hsmQueue = InitHSM();
+	time_t timeStart = time(NULL);
+	time_t timeNow;
+	time_t lastTime = 0;
+
+	//Initialize everything..
+	//Start main loop
+	int loop = TRUE;
+	while (loop){
+		delay(200);
+        	timeNow = time(NULL);
+		int timeRunning = timeNow-timeStart;
+		//clock_gettime(CLOCK_REALTIME, &now);
+		printf("time: %u\n", timeRunning);
+		while (queueSize(hsmQueue) > 0){
+			//Remove event from queue, and pass it to the HSM
+			Event retEvent = RunHSM(removeEvent(hsmQueue));
+
+			if (retEvent.Type != No_Event){
+				printf(ANSI_COLOR_RED"Error: Event was not handled in HSM - %s" ANSI_COLOR_RESET "\n", EventStr[retEvent.Type]);
+				loop = FALSE;
+			}
+		}
+	}
+
+	// TODO: Need a way to exit while loop
+	freeQueue(&hsmQueue);
+	pthread_exit(NULL);
+	return 0;
+#else
 	while(1) {
 		delay(10);
-		fbArgs->rollState->currentValue = round(gArgs->x*10)/10.0;
-		//fbArgs->zState->currentValue = 0;//gArgs->x;
-		/*deltaAngles.x = prevX-gArgs->x;
-		deltaAngles.y = prevY-gArgs->y;
-		deltaAngles.z = prevZ-gArgs->z;
-		prevX=gArgs->x;
-		prevY=gArgs->y;
-		prevZ=gArgs->z;*/
-		/*ordinalAxis->Z = gArgs->xl_z;
-		ordinalAxis->Y = gArgs->xl_y;
-		ordinalAxis->X = gArgs->xl_x;*/
-		//OrdinalAxis->Z = gArgs->xl_z;
-		//updateXLCoordinateAxis(*gArgs,OrdinalAxis);
-		//printf("TILT STATUS\n========================\n");
+	//	fbArgs->rollState->currentValue = round(gArgs->x*10)/10.0;
 		printf("\rx: %6.3f", gArgs->x);//(float)*(pCollection+sizeof(float)));
 		printf(" | y: %6.3f", gArgs->y);//(float)*(pCollection+sizeof(float)*2));
 		printf(" | z: %6.3f", gArgs->z);
@@ -117,16 +149,6 @@ int main(void) {
 		printf(" | OZ: %6.3f",OrdinalAxis->Z);
 		printf(" | Zset: %5.2f", fbArgs->zState->setpoint);
 		fflush(stdout);
-//			 ------ PID LOOP -------
-		/*x_err_p = round(gArgs->x-T_ROLL*10)/10; // P
-		x_err_i += x_err_p; 			// I
-		x_err_d = x_err_prev - x_err_p;		// D
-		x_err_prev = x_err_p;
-		x_out =	ROLL_KP*(x_err_p) + ROLL_KI*(x_err_i) + ROLL_KD*(x_err_d);
-		mArgs->roll_correction = x_out;*/
-		
-		//printf("x-correction: %0.2f\n================================\n", x_out);
-		//printf("Pressure: %0.2f\nTemperature: %0.2f CEL\n============================================\n", psArgs->pres,psArgs->temp);
 
 	}
 	free(gArgs);
@@ -134,3 +156,5 @@ int main(void) {
 	pthread_exit(NULL);
 	return 0;
 }
+
+#endif

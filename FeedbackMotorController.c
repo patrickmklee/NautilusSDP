@@ -54,7 +54,7 @@ void updateSingleMotorPW(int pin, int pulse){
 	pulse = NEUTRAL_THROTTLE+(500.0*percent)/100;
 	gpioServo(pin,pulse);
 }*/
-void updateMotorStates(float roll_correction, float pitch_correction, float yaw_correction, float z_correction){
+void updateMotorStates(float roll_correction, float pitch_correction, float yaw_correction, float vx_correction, float z_correction){
 //void updateMotorStates(struct MotorThrottleState *currentThrottleState, struct TopFeedbackState *PIDOutput){
 	// Motor A:	Right Top Motor
 	// Motor B:	Left Top Motor
